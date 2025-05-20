@@ -7,37 +7,40 @@
 
 import Foundation
 
+struct ScoreEntry: Codable, Identifiable {
+    let id: UUID
+    let name: String
+    let score: Int
+    
+    /// 自己用時的便利建構
+    init(name: String, score: Int, id: UUID = UUID()) {
+        self.id = id
+        self.name = name
+        self.score = score
+    }
+}
+
+
 struct ScoreManager {
-    private static let scoresKey = "BallFusionScores"  // UserDefaults 存取用的鍵值
+    private static let key = "CompBallTop5"
     
-    /// 新增一筆遊戲得分到本機排行榜中，並自動排序和截取最高的若干筆分數
-    static func addScore(_ score: Int) {
-        let defaults = UserDefaults.standard
-        // 讀取已存在的分數陣列，若沒有則使用空陣列
-        var scores = defaults.array(forKey: scoresKey) as? [Int] ?? []
-        // 加入新的得分
-        scores.append(score)
-        // 由高到低排序分數
-        scores.sort(by: >)
-        // （可選）保留前 N 筆最高分，例如保留前10名
-        if scores.count > 10 {
-            scores = Array(scores.prefix(10))
+    /// 讀取前 5
+    static func getTopScores() -> [ScoreEntry] {
+        guard
+            let data = UserDefaults.standard.data(forKey: key),
+            let list = try? JSONDecoder().decode([ScoreEntry].self, from: data)
+        else { return [] }
+        return list
+    }
+    
+    /// 新增一筆 (自動排序並截前 5)
+    static func addScore(name: String, score: Int) {
+        var list = getTopScores()
+        list.append(ScoreEntry(name: name, score: score))
+        list.sort { $0.score > $1.score }
+        if list.count > 5 { list = Array(list.prefix(5)) }
+        if let data = try? JSONEncoder().encode(list) {
+            UserDefaults.standard.set(data, forKey: key)
         }
-        // 將更新後的分數列表保存回 UserDefaults
-        defaults.set(scores, forKey: scoresKey)
-        defaults.synchronize()
-    }
-    
-    /// 從本機排行榜取得所有儲存的分數（已排序，由高到低）
-    static func getTopScores() -> [Int] {
-        let defaults = UserDefaults.standard
-        let scores = defaults.array(forKey: scoresKey) as? [Int] ?? []
-        // 確保以由大到小排序後返回
-        return scores.sorted(by: >)
-    }
-    
-    /// （可選）清除本機儲存的所有分數記錄
-    static func clearScores() {
-        UserDefaults.standard.removeObject(forKey: scoresKey)
     }
 }

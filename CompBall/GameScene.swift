@@ -8,9 +8,14 @@
 import SpriteKit
 import GameplayKit
 import AVFoundation
+
+extension Notification.Name {
+    static let gameOverScore = Notification.Name("GameOverScore")
+}
  
 class GameScene: SKScene, SKPhysicsContactDelegate {
-    
+    private let mode: GameMode   // ← 新增
+
     // MARK: - 遊戲容器區域參數
     private var containerWidth: CGFloat = 0    // 容器寬度（左右邊界距離）
     private var containerHeight: CGFloat = 0   // 容器高度（底部到開口處距離）
@@ -26,7 +31,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private var waitingForNextBall = false
 
     private var bgmPlayer: AVAudioPlayer?
-
     
     // MARK: - 預覽與拖曳相關
     /// 預覽球隊列：第一個元素為即將掉落球（放在容器中間），第二個為右側預覽（下一顆球）
@@ -59,6 +63,16 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private var isDragging: Bool = false
     /// 記錄球持續超出容器頂端的起始時間
     private var gameOverTimer: TimeInterval? = nil
+    
+    init(size: CGSize, mode: GameMode) {
+        self.mode = mode
+        super.init(size: size)
+    }
+    
+    required init?(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
     
     // MARK: - 場景初始化（視圖呈現場景時呼叫）
     override func didMove(to view: SKView) {
@@ -333,7 +347,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
                     // 自動移除特效（建議與 .sks 的 lifetime 對應）
                     emitter.run(SKAction.sequence([
-                        SKAction.wait(forDuration: 1.0),
+                        SKAction.wait(forDuration: 0.5),
                         SKAction.removeFromParent()
                     ]))
                 }
@@ -408,8 +422,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     }
 
 
-
-    
     /// 遊戲結束處理：停止物理模擬、顯示分數及重新開始選項，並儲存分數
     private func triggerGameOver() {
         gameOver = true
@@ -430,7 +442,19 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         restartLabel.name = "restartButton"
         addChild(restartLabel)
         
-        ScoreManager.addScore(score)
+        let currentTop = ScoreManager.getTopScores()
+        let threshold = currentTop.last?.score ?? 0
+        let qualifies = currentTop.count < 5 || score > threshold
+
+        if qualifies {
+            NotificationCenter.default.post(name: .gameOverScore,
+                                            object: nil,
+                                            userInfo: ["score": score])
+            self.isPaused = true        // 暫停等待輸名
+        } else {
+            ScoreManager.addScore(name: "Player", score: score)
+        }
+
         
         if let bestScore = ScoreManager.getTopScores().first {
             let bestLabel = SKLabelNode(fontNamed: "Arial")

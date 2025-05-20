@@ -12,12 +12,12 @@ import SwiftUI
 struct GameApp: App {
     var body: some Scene {
         WindowGroup {
-            GameView()
+            MainMenuView()
         }
     }
 }
 
 
 #Preview(){
-    GameView()
+    MainMenuView() 
 }
