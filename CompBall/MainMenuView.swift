@@ -56,11 +56,11 @@ struct MainMenuView: View {
         .fullScreenCover(item: $selection) { sel in
             switch sel {
             case .normal:
-                GameView(mode: .normal)      // 一般模式
+                GameView(mode: .normal)
             case .countdown:
-                GameView(mode: .countdown)   // 倒數模式（下一步會實作）
+                GameView(mode: .countdown)
             case .ranking:
-                RankingView()                // 排行榜（下一步會實作）
+                RankingView()
             case .none:
                 EmptyView()
             }

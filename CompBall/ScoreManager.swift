@@ -1,46 +1,55 @@
-//
-//  ScoreManager.swift
-//  CompBall
-//
-//  Created by 王政甯 on 2025/4/13.
-//
-
 import Foundation
 
-struct ScoreEntry: Codable, Identifiable {
-    let id: UUID
+// -------- 資料結構 --------
+struct NormalEntry: Codable, Identifiable {
+    var id = UUID()
     let name: String
     let score: Int
-    
-    /// 自己用時的便利建構
-    init(name: String, score: Int, id: UUID = UUID()) {
-        self.id = id
-        self.name = name
-        self.score = score
-    }
+}
+struct CountdownEntry: Codable, Identifiable {
+    var id = UUID()
+    let name: String
+    let score: Int
+    let seconds: Int
 }
 
+// -------- 管理 --------
+enum ScoreManager {
+    private static let normalKey    = "CompBallTop10Normal"
+    private static let countdownKey = "CompBallTop10Countdown"
+    private static let maxCount = 10                       // ← 前 10
 
-struct ScoreManager {
-    private static let key = "CompBallTop5"
-    
-    /// 讀取前 5
-    static func getTopScores() -> [ScoreEntry] {
-        guard
-            let data = UserDefaults.standard.data(forKey: key),
-            let list = try? JSONDecoder().decode([ScoreEntry].self, from: data)
-        else { return [] }
-        return list
-    }
-    
-    /// 新增一筆 (自動排序並截前 5)
-    static func addScore(name: String, score: Int) {
-        var list = getTopScores()
-        list.append(ScoreEntry(name: name, score: score))
+    // MARK: 一般
+    static func topNormal() -> [NormalEntry] { load(key: normalKey) }
+    static func addNormal(name: String, score: Int) {
+        var list: [NormalEntry] = load(key: normalKey)
+        list.append(NormalEntry(name: name, score: score))
         list.sort { $0.score > $1.score }
-        if list.count > 5 { list = Array(list.prefix(5)) }
-        if let data = try? JSONEncoder().encode(list) {
-            UserDefaults.standard.set(data, forKey: key)
+        if list.count > maxCount { list = Array(list.prefix(maxCount)) }
+        save(list, key: normalKey)
+    }
+
+    // MARK: 倒數
+    static func topCountdown() -> [CountdownEntry] { load(key: countdownKey) }
+    static func addCountdown(name: String, score: Int, seconds: Int) {
+        var list: [CountdownEntry] = load(key: countdownKey)
+        list.append(CountdownEntry(name: name, score: score, seconds: seconds))
+        list.sort {
+            $0.score > $1.score || ($0.score == $1.score && $0.seconds < $1.seconds)
+        }
+        if list.count > maxCount { list = Array(list.prefix(maxCount)) }
+        save(list, key: countdownKey)
+    }
+
+    // -------- 泛型 load / save --------
+    private static func load<T: Codable>(key: String) -> [T] {
+        guard let d = UserDefaults.standard.data(forKey: key),
+              let l = try? JSONDecoder().decode([T].self, from: d) else { return [] }
+        return l
+    }
+    private static func save<T: Codable>(_ list: [T], key: String) {
+        if let d = try? JSONEncoder().encode(list) {
+            UserDefaults.standard.set(d, forKey: key)
         }
     }
 }

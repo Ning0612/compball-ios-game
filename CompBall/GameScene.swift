@@ -14,8 +14,7 @@ extension Notification.Name {
 }
  
 class GameScene: SKScene, SKPhysicsContactDelegate {
-    private let mode: GameMode   // ← 新增
-
+    let mode: GameMode
     // MARK: - 遊戲容器區域參數
     private var containerWidth: CGFloat = 0    // 容器寬度（左右邊界距離）
     private var containerHeight: CGFloat = 0   // 容器高度（底部到開口處距離）
@@ -23,15 +22,21 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private var containerRightX: CGFloat = 0   // 容器右側 X 座標
     private var countdownLabel: SKLabelNode?
 
-    
     // MARK: - 遊戲狀態參數
     private var score: Int = 0                 // 當前分數
     private var scoreLabel: SKLabelNode!       // 顯示分數的標籤節點
     private var gameOver: Bool = false         // 遊戲是否結束的狀態旗標
+    
+    // 追蹤遊玩時間（倒數模式用）
+    private var startTime: TimeInterval = 0
+    private var pauseAccum: TimeInterval = 0
+    private var pauseBegin: TimeInterval?
+
     private var waitingForNextBall = false
+    private var restartLocked = false     // 防止連點「重新開始」
 
     private var bgmPlayer: AVAudioPlayer?
-    
+        
     // MARK: - 預覽與拖曳相關
     /// 預覽球隊列：第一個元素為即將掉落球（放在容器中間），第二個為右側預覽（下一顆球）
     private var ballQueue: [Int] = [Int]()
@@ -56,6 +61,27 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         66   // Level11 球合成得分 66
     ]
     
+    /// 各等級升級後補秒（index = 升級後等級）
+    private static let bonusSeconds: [Float] = [
+        0,  // dummy for index 0
+        0,
+        0.2,
+        0.4,
+        0.6,
+        0.9,
+        1.3,
+        1.7,
+        2.3,
+        3.4,
+        4.5,
+        6
+    ]
+    
+    // 倒數模式
+    private var timeLeft: Double = 30          // 剩餘秒
+    private var lastUpdate: TimeInterval = 0
+    private var timerLabel: SKLabelNode?
+
     // MARK: - 拖曳球與結束判斷相關
     /// 正在拖曳的球（即將放下的球，顯示於容器中間）
     private var draggableBall: BallNode?
@@ -94,6 +120,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         // 添加分數標籤
         setupScoreLabel()
+        setupTimerLabel()
         
         // 初始化預覽球隊列：第一顆為即將掉落的球，第二顆為右側預覽（下一顆）
         ballQueue = [randomBallLevel(), randomBallLevel()]
@@ -101,10 +128,11 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         showPreviewQueue()
         // 準備顯示放球區中間的可拖曳球（取自 ballQueue[0]）
         prepareDroppableBall()
-        
         score = 0
         gameOver = false
-        playBackgroundMusic()
+        AudioManager.playBGM()
+        startTime = CACurrentMediaTime()
+        lastUpdate = CACurrentMediaTime()
     }
     
     /// 建立容器的物理邊界（左牆、右牆、底部）以及視覺標示：頂部虛線、底部實線
@@ -234,12 +262,27 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         draggableBall = ball
     }
     
+    private func setupTimerLabel() {
+        guard mode == .countdown else { return }      // 只在倒數模式顯示
+        let label = SKLabelNode(fontNamed: "Arial-BoldMT")
+        label.fontSize = 26
+        label.fontColor = .green
+        // —— 位置：分數標籤正下方 35pt ——
+        label.horizontalAlignmentMode = .left
+        label.position = CGPoint(x: scoreLabel.position.x,
+                                 y: scoreLabel.position.y - 35)
+        label.text = String(format: "TIME  %.1f", timeLeft)
+        addChild(label)
+        timerLabel = label
+    }
+
     // MARK: - 觸碰事件處理（拖曳放球）
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard !self.isPaused else { return }
         guard let touch = touches.first else { return }
         let location = touch.location(in: self)
 
-        if gameOver {
+        if gameOver && !restartLocked{
             let touchedNodes = nodes(at: location)
             for node in touchedNodes {
                 if node.name == "restartButton" {
@@ -268,6 +311,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
     
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard !self.isPaused else { return }
         guard isDragging, let touch = touches.first, let ball = draggableBall else { return }
         let location = touch.location(in: self)
         let radius = BallNode.radii[ball.level]
@@ -282,6 +326,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     }
     
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard !self.isPaused else { return }
         if isDragging, let ball = draggableBall {
             ball.physicsBody?.isDynamic = true
             activeBalls.append(ball)
@@ -300,8 +345,27 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
     
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard !self.isPaused else { return }
         touchesEnded(touches, with: event)
     }
+    
+    // MARK: - 外部控制
+    /// 當遊戲被暫停 / 恢復時呼叫，以重置「球超出邊界」倒數計時
+    func resetBoundaryCountdown() {
+        gameOverTimer = nil          
+    }
+    
+    func sceneDidPause() {
+        pauseBegin = CACurrentMediaTime()
+    }
+
+    func sceneDidResume() {
+        if let p = pauseBegin {
+            pauseAccum += CACurrentMediaTime() - p
+        }
+        pauseBegin = nil
+    }
+
     
     // MARK: - 物理碰撞處理
     func didBegin(_ contact: SKPhysicsContact) {
@@ -347,15 +411,22 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
                     // 自動移除特效（建議與 .sks 的 lifetime 對應）
                     emitter.run(SKAction.sequence([
-                        SKAction.wait(forDuration: 0.5),
+                        SKAction.wait(forDuration: 0.3),
                         SKAction.removeFromParent()
                     ]))
                 }
                 
-                self.playMergeSound()
+                AudioManager.playEffect(named: "merge.wav", on: self)
 
                 lowerBall.upgrade()
                 lowerBall.isMerging = false // 升級完成，釋放旗標
+                
+                if self.mode == .countdown {
+                    let bonus = GameScene.bonusSeconds[lowerBall.level]
+                    self.timeLeft += Double(bonus)
+                    self.timerLabel?.fontColor = self.timeLeft <= 10 ? .red : .green
+                    self.timerLabel?.text = String(format: "TIME  %.1f", self.timeLeft)
+                }
 
                 let newLevel = lowerBall.level
                 if newLevel < self.scoreValues.count {
@@ -387,6 +458,15 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             let radius = BallNode.radii[ball.level]
             return ball.position.y + radius > containerHeight
         }
+        
+        if mode == .countdown && !isPaused {
+            let dt = currentTime - lastUpdate
+            timeLeft -= dt
+            timerLabel?.text = String(format: "TIME  %.1f", max(0, timeLeft))
+            timerLabel?.fontColor = timeLeft <= 10 ? .red : .green
+            if timeLeft <= 0 { triggerGameOver() }
+        }
+        lastUpdate = currentTime
 
         if ballAboveExists {
             if gameOverTimer == nil {
@@ -442,47 +522,90 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         restartLabel.name = "restartButton"
         addChild(restartLabel)
         
-        let currentTop = ScoreManager.getTopScores()
-        let threshold = currentTop.last?.score ?? 0
-        let qualifies = currentTop.count < 5 || score > threshold
+        // 取得目前榜單
+        let currentTop: [Any]
+            switch mode {
+                case .normal:     currentTop = ScoreManager.topNormal()
+                case .countdown:  currentTop = ScoreManager.topCountdown()
+        }
+
+        // 判斷是否進榜
+        let threshold = (currentTop as? [NormalEntry])?.last?.score ??
+                        (currentTop as? [CountdownEntry])?.last?.score ?? 0
+        let qualifies = currentTop.count < 10 || score > threshold
 
         if qualifies {
+            var info: [String: Any] = ["score": score]
+            if mode == .countdown {
+                let elapsed = Int(CACurrentMediaTime() - startTime - pauseAccum)
+                info["seconds"] = elapsed
+            }
             NotificationCenter.default.post(name: .gameOverScore,
                                             object: nil,
-                                            userInfo: ["score": score])
-            self.isPaused = true        // 暫停等待輸名
+                                            userInfo: info)
+            self.isPaused = true
         } else {
-            ScoreManager.addScore(name: "Player", score: score)
+            // 直接寫入
+            if mode == .normal {
+                ScoreManager.addNormal(name: "Player", score: score)
+            } else {
+                let elapsed = Int(CACurrentMediaTime() - startTime - pauseAccum)
+                ScoreManager.addCountdown(name: "Player", score: score, seconds: elapsed)
+            }
         }
 
+        // let elapsed = Int(CACurrentMediaTime() - startTime - pauseAccum)
         
-        if let bestScore = ScoreManager.getTopScores().first {
+        let bestScore: Int? = {
+            switch mode {
+            case .normal:
+                return ScoreManager.topNormal().first?.score
+            case .countdown:
+                return ScoreManager.topCountdown().first?.score
+            }
+        }()
+
+        if let best = bestScore {
             let bestLabel = SKLabelNode(fontNamed: "Arial")
-            bestLabel.text = "最高紀錄: \(bestScore)"
+            bestLabel.text = "最高紀錄: \(best)"
             bestLabel.fontSize = 20
             bestLabel.fontColor = .white
-            bestLabel.position = CGPoint(x: size.width / 2, y: containerHeight / 2 - 60)
+            bestLabel.position = CGPoint(x: size.width/2, y: containerHeight/2 - 60)
             addChild(bestLabel)
         }
+
     }
     
     /// 重新開始遊戲：重設狀態、清除節點並初始化
     private func restartGame() {
+        NotificationCenter.default.post(name: .gameOverScore, object: nil, userInfo: [:])
+        restartLocked = false
+        gameOver      = false
         physicsWorld.speed = 1
+        self.isPaused = false
+
         removeAllChildren()
         activeBalls.removeAll()
-        
+        previewNodes.removeAll()
+        countdownLabel = nil
+        timerLabel     = nil
+
         score = 0
-        gameOver = false
         gameOverTimer = nil
-        
+        waitingForNextBall = false
+        timeLeft = (mode == .countdown) ? 30 : 0
+        startTime = CACurrentMediaTime()
+        lastUpdate = startTime
+
         setupContainerBoundaries()
         setupScoreLabel()
-        
+        setupTimerLabel()
+
         ballQueue = [randomBallLevel(), randomBallLevel()]
         showPreviewQueue()
         prepareDroppableBall()
     }
+
     
     private func playBackgroundMusic() {
         if let url = Bundle.main.url(forResource: "background", withExtension: "mp3") {
@@ -497,9 +620,4 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             }
         }
     }
-    
-    private func playMergeSound() {
-        run(SKAction.playSoundFileNamed("merge.wav", waitForCompletion: false))
-    }
-
 }
