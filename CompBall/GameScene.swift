@@ -41,12 +41,14 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private var lastUpdate: TimeInterval = 0       // 上次更新時間
     private var timerLabel: SKLabelNode?           // 顯示時間的標籤節點
     private var countdownLabel: SKLabelNode?       // 顯示遊戲結束倒數的標籤
+    
+    private var descriptionLabel: SKLabelNode!
 
     // MARK: - Ball Preview and Dragging Properties
     /// 預覽球隊列：第一個元素為即將掉落球（放在容器中間），第二個為右側預覽（下一顆球）
     private var ballQueue: [Int] = []
     /// 用於右側預覽的球節點（僅顯示下一顆）
-    private var previewNodes: [SKSpriteNode] = []
+    private var previewNodes: [SKNode] = []
     /// 場景中所有已釋放的球（方便統計及後續清除）
     private var activeBalls: [BallNode] = []
     /// 正在拖曳的球（即將放下的球，顯示於容器中間）
@@ -88,6 +90,102 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         4.5,
         6
     ]
+    
+    private var shownLevels: Set<Int> = [] // 記錄哪些等級已顯示過
+
+    private let componentDescriptions: [Int: [String]] = [
+        1: [ // 電晶體
+            "【電晶體】是邏輯元件的最小單位。",
+            "【電晶體】能當作開關控制電流的通斷。",
+            "【電晶體】可用來實現邏輯閘與放大功能。",
+            "【電晶體】構成了現代處理器的基本架構。",
+            "【電晶體】數量是衡量晶片複雜度的指標。",
+            "【電晶體】在奈米尺度上以成千上萬個排列運作。"
+        ],
+        2: [ // 邏輯閘
+            "【邏輯閘】執行 AND、OR、NOT 等基本邏輯運算。",
+            "【邏輯閘】由電晶體構成，是數位電路的基礎。",
+            "【邏輯閘】可組合形成複雜的邏輯功能，如加法器。",
+            "【邏輯閘】是所有數位邏輯設計的核心。",
+            "【邏輯閘】決定訊號如何被處理與輸出。",
+            "【邏輯閘】的組合影響整體邏輯功能的正確性。"
+        ],
+        3: [ // 多工器
+            "【多工器】能在多個輸入中選出一個輸出。",
+            "【多工器】由控制訊號決定輸出的來源。",
+            "【多工器】常見於資料路徑的選擇元件中。",
+            "【多工器】是數位系統中重要的選擇控制器。",
+            "【多工器】可整合不同資料流，節省電路空間。",
+            "【多工器】在 CPU 中常用來切換暫存器與資料線。"
+        ],
+        4: [ // 正反器
+            "【正反器】可儲存一個位元的資料。",
+            "【正反器】是暫存器與計數器的核心元件。",
+            "【正反器】在時脈觸發下改變其狀態。",
+            "【正反器】有多種類型，如 D、T、JK 等。",
+            "【正反器】常用於時序電路的設計中。",
+            "【正反器】能建立穩定的資料儲存結構。"
+        ],
+        5: [ // ALU
+            "【ALU】（算術邏輯單元）能執行基本運算如加法與減法。",
+            "【ALU】同時也能執行 AND、OR 等邏輯運算。",
+            "【ALU】是 CPU 中負責計算的核心單元。",
+            "【ALU】的效能會直接影響整體運算速度。",
+            "【ALU】輸入來自暫存器，輸出回寫至暫存器或記憶體。",
+            "【ALU】運算結果也會更新旗標供後續邏輯判斷使用。"
+        ],
+        6: [ // CU
+            "【CU】（控制單元）解讀指令並產生控制訊號。",
+            "【CU】協調 ALU、記憶體與輸入輸出單元的運作。",
+            "【CU】常以有限狀態機方式設計。",
+            "【CU】負責流程控制與資料流引導。",
+            "【CU】實現指令週期的每個階段，包括取指、解碼與執行。",
+            "【CU】是實現指令集的重要實體。"
+        ],
+        7: [ // CPU
+            "【CPU】是電腦的核心，執行所有計算與控制作業。",
+            "【CPU】由 ALU、CU 與暫存器等子單元構成。",
+            "【CPU】負責依序執行程式中的指令。",
+            "【CPU】效能決定整體系統的速度與反應。",
+            "【CPU】支援多工與中斷等機制以增進效率。",
+            "【CPU】透過匯流排與記憶體與週邊裝置溝通。"
+        ],
+        8: [ // 記憶體
+            "【記憶體】可暫存執行程式所需的資料與指令。",
+            "【記憶體】主要分為揮發性（RAM）與非揮發性（ROM）。",
+            "【記憶體】與 CPU 之間的速度差影響整體效能。",
+            "【記憶體】是資料運算與儲存間的橋梁。",
+            "【記憶體】內部由大量正反器或電容構成。",
+            "【記憶體】在現代電腦中扮演關鍵角色，支援即時資料處理。"
+        ],
+        9: [ // 主機板
+            "【主機板】連接並整合所有硬體元件。",
+            "【主機板】包含晶片組、電源模組與各式插槽。",
+            "【主機板】提供電力與訊號通道給各元件使用。",
+            "【主機板】決定系統的擴充能力與相容性。",
+            "【主機板】整合輸入輸出控制器與週邊裝置支援。",
+            "【主機板】是電腦硬體之間的溝通橋梁。"
+        ],
+        10: [ // 作業系統
+            "【作業系統】管理硬體資源並提供使用者介面。",
+            "【作業系統】負責程序管理、記憶體配置與裝置驅動。",
+            "【作業系統】是應用程式執行的基礎平台。",
+            "【作業系統】提供檔案系統與網路功能。",
+            "【作業系統】是軟硬體間的橋樑。",
+            "【作業系統】常見有 Windows、Linux、macOS 等。"
+        ],
+        11: [ // 電腦
+            "【電腦】是由電晶體、邏輯閘等基本元件構成。",
+            "【電腦】整合 CPU、記憶體、儲存與輸出入裝置。",
+            "【電腦】透過主機板讓各元件協同運作。",
+            "【電腦】依賴作業系統來管理與執行各種應用。",
+            "【電腦】具備高速處理能力與高度擴充性。",
+            "【電腦】是現代生活與科技的核心工具。"
+        ]
+    ]
+
+
+
 
     // MARK: - Initialization
     init(size: CGSize, mode: GameMode) {
@@ -110,9 +208,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
 
         // 計算遊戲容器的尺寸與位置
-        containerWidth = size.width * 0.6
+        containerWidth = size.width * 0.5
         containerHeight = size.height * 0.85
-        containerLeftX = (size.width - containerWidth) / 2
+        containerLeftX = (size.width - containerWidth) / 2 + 25
         containerRightX = containerLeftX + containerWidth
 
         // 設定物理世界與碰撞代理
@@ -143,6 +241,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
         // 播放背景音樂
         AudioManager.playBGM()
+        setupDescriptionLabel()
     }
 
     // MARK: - Setup Methods
@@ -166,8 +265,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         // 底部物理邊界節點
         let bottomEdgeNode = SKNode()
-        bottomEdgeNode.physicsBody = SKPhysicsBody(edgeFrom: CGPoint(x: containerLeftX, y:22),
-                                                   to: CGPoint(x: containerRightX, y: 22))
+        bottomEdgeNode.physicsBody = SKPhysicsBody(edgeFrom: CGPoint(x: containerLeftX, y:120),
+                                                   to: CGPoint(x: containerRightX, y: 120))
         bottomEdgeNode.physicsBody?.categoryBitMask = PhysicsCategory.boundary
         bottomEdgeNode.physicsBody?.collisionBitMask = PhysicsCategory.ball
         addChild(bottomEdgeNode)
@@ -175,7 +274,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         /*
         // 視覺化顯示：左側邊界線
         let leftEdgePath = CGMutablePath()
-        leftEdgePath.move(to: CGPoint(x: containerLeftX, y: 22))
+        leftEdgePath.move(to: CGPoint(x: containerLeftX, y: 120))
         leftEdgePath.addLine(to: CGPoint(x: containerLeftX, y: containerHeight))
         let leftEdgeShape = SKShapeNode(path: leftEdgePath)
         leftEdgeShape.strokeColor = .white
@@ -184,7 +283,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
         // 視覺化顯示：右側邊界線
         let rightEdgePath = CGMutablePath()
-        rightEdgePath.move(to: CGPoint(x: containerRightX, y: 22))
+        rightEdgePath.move(to: CGPoint(x: containerRightX, y: 120))
         rightEdgePath.addLine(to: CGPoint(x: containerRightX, y: containerHeight))
         let rightEdgeShape = SKShapeNode(path: rightEdgePath)
         rightEdgeShape.strokeColor = .white
@@ -202,13 +301,14 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
         // 視覺化顯示：底部實線
         let bottomPath = CGMutablePath()
-        bottomPath.move(to: CGPoint(x: containerLeftX, y: 22))
-        bottomPath.addLine(to: CGPoint(x: containerRightX, y: 22))
+        bottomPath.move(to: CGPoint(x: containerLeftX, y: 120))
+        bottomPath.addLine(to: CGPoint(x: containerRightX, y: 120))
         let bottomEdgeShape = SKShapeNode(path: bottomPath)
         bottomEdgeShape.strokeColor = .white
         bottomEdgeShape.lineWidth = 2
         addChild(bottomEdgeShape)
         */
+        
     }
 
     /// 設定並添加顯示分數的標籤
@@ -235,6 +335,43 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         addChild(label)
         timerLabel = label
     }
+    
+    private func setupDescriptionLabel() {
+        // 建立文字標籤
+        descriptionLabel = SKLabelNode(fontNamed: "Arial")
+        descriptionLabel.fontSize = 20
+        descriptionLabel.fontColor = .white
+        descriptionLabel.horizontalAlignmentMode = .center
+        descriptionLabel.verticalAlignmentMode = .top
+        descriptionLabel.numberOfLines = 2
+        descriptionLabel.preferredMaxLayoutWidth = 280
+        descriptionLabel.text = getRandomDescription(for: 1)
+
+        // 預估框大小
+        let labelWidth: CGFloat = 295 // 留點 padding
+        let labelHeight: CGFloat = 70
+        // 建立背景框
+        let background = SKShapeNode(rectOf: CGSize(width: labelWidth, height: labelHeight), cornerRadius: 10)
+        background.fillColor = UIColor(red: 43/255.0, green: 55/255.0, blue: 57/255.0, alpha: 1.0)
+        background.strokeColor = UIColor(red: 39/255.0, green: 48/255.0, blue: 54/255.0, alpha: 1.0)
+        background.lineWidth = 6
+        background.zPosition = descriptionLabel.zPosition - 1
+
+        // 設定整體位置（畫面座標）
+        let position = CGPoint(x: 530, y: 72)
+        background.position = position
+        descriptionLabel.position = CGPoint(x: 0, y: labelHeight / 2 - 2) // 調整讓文字在框內偏上對齊
+
+        // 把 label 加入背景節點，再一起加入場景
+        background.addChild(descriptionLabel)
+        addChild(background)
+    }
+
+
+    private func getRandomDescription(for level: Int) -> String {
+        guard let options = componentDescriptions[level] else { return "" }
+        return options.randomElement() ?? ""
+    }
 
     // MARK: - Ball Management
     /// 隨機產生 1～5 級的球（較低等級機率較高）
@@ -255,6 +392,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
     /// 右側預覽區僅顯示下一顆球（ballQueue[1]）
     private func showPreviewQueue() {
+        // 清除先前的預覽球與文字
         for node in previewNodes {
             node.removeFromParent()
         }
@@ -263,14 +401,25 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         if ballQueue.count > 1 {
             let level = ballQueue[1]
             let baseX = containerRightX + 60  // 預覽區 X 位置
-            let baseY = containerHeight + 50    // 預覽區 Y 起始位置
+            let baseY = containerHeight + 50  // 預覽區 Y 起始位置
             let radius = BallNode.radii[level]
 
+            // 預覽球本體
             let previewBall = SKSpriteNode(texture: SKTexture(imageNamed: "ball_\(level)"))
             previewBall.size = CGSize(width: radius * 2, height: radius * 2)
             previewBall.position = CGPoint(x: baseX, y: baseY)
             addChild(previewBall)
             previewNodes.append(previewBall)
+
+            // "Next" 標籤放在球下方
+            let nextLabel = SKLabelNode(text: "Next")
+            nextLabel.fontName = "Arial-BoldMT"
+            nextLabel.fontSize = 20
+            nextLabel.fontColor = .white
+            nextLabel.position = CGPoint(x: baseX, y: baseY - 55 - 20) // 球底部下 20px
+            nextLabel.zPosition = 10
+            addChild(nextLabel)
+            previewNodes.append(nextLabel)
         }
     }
 
@@ -419,6 +568,12 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
                     emitter.zPosition = 50
                     self.addChild(emitter)
+                    
+                    let newLevel = lowerBall.level
+                    if !self.shownLevels.contains(newLevel) {
+                        self.shownLevels.insert(newLevel)
+                        self.descriptionLabel.text = self.getRandomDescription(for: newLevel + 1)
+                    }
 
                     // 自動移除特效（建議與 .sks 的 lifetime 對應）
                     emitter.run(SKAction.sequence([
@@ -431,6 +586,12 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
                 lowerBall.upgrade()
                 lowerBall.isMerging = false // 升級完成，釋放旗標
+                
+                if self.mode == .countdown {
+                    let bonus = GameScene.bonusSeconds[lowerBall.level]
+                    self.timeLeft += Double(bonus)
+                }
+
  
                 // 更新分數
                 let newLevel = lowerBall.level
@@ -614,6 +775,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         setupContainerBoundaries()
         setupScoreLabel()
         setupTimerLabel()
+        setupDescriptionLabel()
 
         // 重新初始化球隊列和可拖曳球
         ballQueue = [randomBallLevel(), randomBallLevel()]
@@ -625,5 +787,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         background.zPosition = -1 // 放到最底層
         background.size = size
         addChild(background)
+        
+        // 重設已顯示過的說明與預設顯示電晶體說明
+        shownLevels = []
+        descriptionLabel.text = getRandomDescription(for: 1)
     }
 }
