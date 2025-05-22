@@ -8,78 +8,100 @@
 import SwiftUI
 import SpriteKit
 
-/// 遊戲主選單：深色背景 + 三顆按鈕
+/// 遊戲主選單：深色背景 + 三顆按鈕，提供「一般模式」、「倒數模式」及「排行榜」選項。
 struct MainMenuView: View {
-    @State private var selection: MenuSelection? = nil
 
-    enum MenuSelection {
-        case none
-        case normal     // 一般模式
-        case countdown  // 倒數模式
-        case ranking    // 排行榜
+    // MARK: - Menu Selection Enum
+    /// Defines the possible selections from the main menu, conforming to `Identifiable`
+    /// to be used with `.fullScreenCover(item:)`.
+    enum MenuSelection: Identifiable {
+        case none        // No selection
+        case normal      // Normal game mode
+        case countdown   // Countdown game mode
+        case ranking     // Ranking view
+
+        // Conformance to Identifiable for use with `fullScreenCover`
+        var id: Int { hashValue }
     }
-        
+
+    // MARK: - State Properties
+    @State private var selection: MenuSelection? = nil // Tracks the currently selected menu item
+
+    // MARK: - Body
     var body: some View {
         ZStack {
-            // 深色背景
-            Color(.black)
+            
+            Image("main_background")
+                .resizable()
+                .scaledToFill()
                 .ignoresSafeArea()
             
-            VStack(spacing: 32) {
-                Text("CompBall")
-                    .font(.largeTitle.bold())
-                    .foregroundColor(.white)
-                
-                // 一般模式
-                Button {
-                    selection = .normal
-                } label: {
-                    menuButtonLabel("一般模式")
-                }
-                
-                // 倒數模式
-                Button {
-                    selection = .countdown
-                } label: {
-                    menuButtonLabel("倒數模式")
-                }
-                
-                // 排行榜
-                Button {
-                    selection = .ranking
-                } label: {
-                    menuButtonLabel("排行榜")
-                }
-            }
-        }
-        // 依照 selection push 對應畫面
-        .fullScreenCover(item: $selection) { sel in
-            switch sel {
-            case .normal:
-                GameView(mode: .normal)
-            case .countdown:
-                GameView(mode: .countdown)
-            case .ranking:
-                RankingView()
-            case .none:
-                EmptyView()
-            }
-        }
-    }
-    
-    /// 統一的按鈕樣式
-    private func menuButtonLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.title2.bold())
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color.white.opacity(0.12))
-            .foregroundColor(.white)
-            .cornerRadius(12)
-    }
-}
 
-/// 讓 .fullScreenCover 的 item 符合 Identifiable
-extension MainMenuView.MenuSelection: Identifiable {
-    var id: Int { hashValue }
+            VStack(spacing: 30) {
+                Spacer()
+                    .frame(height: 340)
+                // MARK: - Menu Buttons
+
+                // Button for Normal Mode
+                Button {
+                    selection = .normal // Set selection to normal mode
+                } label: {
+                    menuButtonLabel("一般模式") // Uses a common style for all menu buttons
+                }
+
+                // Button for Countdown Mode
+                Button {
+                    selection = .countdown // Set selection to countdown mode
+                } label: {
+                    menuButtonLabel("倒數模式") // Uses a common style for all menu buttons
+                }
+
+                // Button for Ranking
+                Button {
+                    selection = .ranking // Set selection to ranking view
+                } label: {
+                    menuButtonLabel("排行榜") // Uses a common style for all menu buttons
+                }
+            }
+        }
+        // MARK: - Full Screen Cover Navigation
+        // Presents different views based on the `selection` state.
+        .fullScreenCover(item: $selection) { selectedCase in
+            switch selectedCase {
+            case .normal:
+                GameView(mode: .normal) // Navigate to GameView in normal mode
+            case .countdown:
+                GameView(mode: .countdown) // Navigate to GameView in countdown mode
+            case .ranking:
+                RankingView() // Navigate to RankingView
+            case .none:
+                EmptyView() // No view shown if .none is selected
+            }
+        }
+    }
+
+    /// MARK: - Private Helper Views
+    /// Provides a consistent visual style for all menu buttons, with customizable colors.
+    /// - Parameters:
+    ///   - text: The text to display on the button.
+    ///   - foregroundColor: The text color.
+    ///   - backgroundColor: The background color.
+    /// - Returns: A `View` configured with the menu button styling.
+    private func menuButtonLabel(
+        _ text: String,
+        foregroundColor: Color = .black,
+        backgroundColor: Color = Color.white.opacity(0.6)
+    ) -> some View {
+        Text(text)
+            .font(.system(size: 50))
+            .frame(maxWidth: 600)
+            .padding()
+            .background(backgroundColor)
+            .foregroundColor(foregroundColor)
+            .cornerRadius(20)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.black.opacity(0.8), lineWidth: 2)
+            )
+    }
 }

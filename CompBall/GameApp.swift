@@ -5,7 +5,6 @@
 //  Created by 王政甯 on 2025/4/13.
 //
 
-// GameApp.swift
 import SwiftUI
 
 @main
@@ -17,7 +16,7 @@ struct GameApp: App {
     }
 }
 
-
-#Preview(){
-    MainMenuView() 
+// MARK: - Xcode 預覽
+#Preview {
+    MainMenuView()
 }
