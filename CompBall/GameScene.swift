@@ -105,8 +105,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         // 設定背景顏色
         self.backgroundColor = SKColor.black
         
-        // 調整容器尺寸：原先 containerWidth = size.width * 0.8, containerHeight = size.height * 0.85，現各縮小約 90%
-        containerWidth = size.width * 0.72
+        containerWidth = size.width * 0.6
         containerHeight = size.height * 0.765
         containerLeftX = (size.width - containerWidth) / 2
         containerRightX = containerLeftX + containerWidth
@@ -202,9 +201,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     /// 設定並添加顯示分數的標籤
     private func setupScoreLabel() {
         scoreLabel = SKLabelNode(fontNamed: "Arial")
-        scoreLabel.fontSize = 24
+        scoreLabel.fontSize = 28
         scoreLabel.fontColor = .white
-        scoreLabel.position = CGPoint(x: containerLeftX + 10, y: containerHeight + 30)
+        scoreLabel.position = CGPoint(x: containerLeftX - 140, y: containerHeight + 50)
         scoreLabel.horizontalAlignmentMode = .left
         scoreLabel.text = "Score: 0"
         addChild(scoreLabel)
@@ -364,6 +363,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             pauseAccum += CACurrentMediaTime() - p
         }
         pauseBegin = nil
+        lastUpdate = CACurrentMediaTime()
     }
 
     
@@ -442,7 +442,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     override func update(_ currentTime: TimeInterval) {
         guard !gameOver else { return }
-
+        
         // 判斷落球是否還在容器上方（延遲生成新球）
         if waitingForNextBall, let lastBall = activeBalls.last {
             let radius = BallNode.radii[lastBall.level]
@@ -459,14 +459,17 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             return ball.position.y + radius > containerHeight
         }
         
-        if mode == .countdown && !isPaused {
-            let dt = currentTime - lastUpdate
+        // -------- 倒數模式計時 --------
+        var dt: Double = 0
+        dt = currentTime - lastUpdate
+        if mode == .countdown {
             timeLeft -= dt
             timerLabel?.text = String(format: "TIME  %.1f", max(0, timeLeft))
             timerLabel?.fontColor = timeLeft <= 10 ? .red : .green
             if timeLeft <= 0 { triggerGameOver() }
         }
         lastUpdate = currentTime
+
 
         if ballAboveExists {
             if gameOverTimer == nil {
@@ -554,7 +557,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             }
         }
 
-        // let elapsed = Int(CACurrentMediaTime() - startTime - pauseAccum)
+        let elapsed = Int(CACurrentMediaTime() - startTime - pauseAccum)
         
         let bestScore: Int? = {
             switch mode {

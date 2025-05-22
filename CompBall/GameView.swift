@@ -91,7 +91,7 @@ struct GameView: View {
             TextField("Name", text: $inputName)
             Button("確定") {
                 let name = inputName.trimmingCharacters(in: .whitespaces)
-                let finalName = name.isEmpty ? "unknown" : name     // ← 空白給 unknown
+                let finalName = name.isEmpty ? "Unknown" : name     // ← 空白給 unknown
                 switch gameScene.mode {
                 case .normal:
                     ScoreManager.addNormal(name: finalName, score: tempScore)
