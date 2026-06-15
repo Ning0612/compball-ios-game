@@ -47,5 +47,14 @@
 
 ---
 
+## Repository
+
+```bash
+git clone https://github.com/Ning0612/compball-ios-game.git
+cd compball-ios-game
+```
+
+---
+
 Developed for [iOS Programing Final Project Game], Department of Computer Science NTUST, Spring 2025.
 Author: [Ning / B11110524]
