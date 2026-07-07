@@ -45,6 +45,19 @@
 - BGM：「BGM 8-bit01」by 魔王魂（https://maou.audio/）
 - Music: "BGM 8-bit01" by MaouDamashii (https://maou.audio/)
 
+## 圖片與素材說明
+
+- 遊戲元件圖片、背景與 app icon 為本課程專案準備的 AI 生成素材。
+- 音樂、音效、圖片、截圖與課程報告不包含在 source-code MIT 授權範圍內，詳見 [ASSET_CREDITS.md](ASSET_CREDITS.md)。
+
+## 授權
+
+Source code is released under the MIT License. See [LICENSE](LICENSE).
+
+The MIT License applies to the original source code only. Bundled audio,
+generated images, screenshots, and course report material remain under their
+own terms or are provided only as project demonstration assets.
+
 ---
 
 ## Repository
