@@ -4,6 +4,8 @@
 本專案為國立臺灣科技大學資訊工程系「iOS 程式設計」課程之期末專題。
 這是一款基於 SwiftUI 和 SpriteKit 開發的經典物理合成遊戲，主題為「電子元件合成升級」。
 
+> **課程專案**：國立臺灣科技大學｜113.2｜CS3042701｜iOS 程式設計｜期末專案
+
 ## 專案狀態
 
 本專案是 113.2 臺科 CS3042701「iOS 程式設計」期末專案。課程展示與公開整理已完成，後續不再持續維護。
@@ -72,6 +74,3 @@ cd compball-ios-game
 ```
 
 ---
-
-Developed for [iOS Programing Final Project Game], Department of Computer Science NTUST, Spring 2025.
-Author: Ning
