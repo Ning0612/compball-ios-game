@@ -74,4 +74,4 @@ cd compball-ios-game
 ---
 
 Developed for [iOS Programing Final Project Game], Department of Computer Science NTUST, Spring 2025.
-Author: [Ning / B11110524]
+Author: Ning
